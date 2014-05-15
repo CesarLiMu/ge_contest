@@ -1,0 +1,13 @@
+Flight.fs is the step-wise moving the plane toward waypoints, by parsing
+the instructions.
+
+proximity_tree.fs is to make a tree for traverse?
+
+Serialization.fs is the function to read in addtional files like weather
+info
+
+Simulation.fs is the main function to run the process.
+
+next step is to understand the proximity_tree?
+
+

@@ -13,6 +13,6 @@ def fuelBurn(model, weight, altitude):
     # Holdingmodel, float<pounds>, float<feet>
     w = weight
     a = altitude
-    fuelBurn = model.FuelIntercept + model.FuelWeight * w + model.FuelAltitude * a +\
+    fuelBurn = model.FuelIntercept + model.FuelWeight * w + model.FuelAltitude * a + \
         model.FuelWeightAltitude2 * w * a * a
     return fuelBurn # FuelPounds/Hours

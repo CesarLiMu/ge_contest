@@ -1,11 +1,20 @@
 from collections import namedtuple
 import numpy as np
+import math
 
-Costs = namedtuple('Costs',
-                          ['FuelCost',
-                            'DelayCost',
-                            'TurbulenceCost',
-                            'OscilateCost'])
+Costs = namedtuple('Costs', [
+        'FuelCost',
+        'DelayCost',
+        'TurbulenceCost',
+        'OscillationCost'])
+
+def accumulateCosts(c): # Costs
+    return c.FuelCost + c.DelayCost + c.TurbulenceCost + c.OscillationCost
+
+class Direction:
+    Ascending = 1
+    Cruise = 0
+    Descending = -1
 
 class Inner:
     def __init__(self):
@@ -27,7 +36,7 @@ class Inner:
         
         if  altDalta > 1e-6:
             direction = Direction.Ascending
-        elif altDalto < -1e-6 :
+        elif altDalta < -1e-6 :
             direction = Direction.Descending
         else:
             direction = Direction.Cruise
@@ -43,7 +52,7 @@ class Inner:
                 changeCount += 1
                 previousAltitude = newAltitude
                 
-        oscillationCost = np.max(0, (changeCount - costParams.FreeAltitudeChanges)) * costParams.AltitudeChangeCost
+        oscillationCost = max(0, (changeCount - costParams.FreeAltitudeChanges)) * costParams.AltitudeChangeCost
         return  oscillationCost
     
         
@@ -52,7 +61,7 @@ class Inner:
         t1 = self.delayReference30Minutes
         t2 = self.delayReference2Hours
         eb = np.log( 1.0/costParams.DelayCostProportion30Minutes-1.0)
-        fb = log(1.0/costParams.DelayCostProportion2Hours-1.0)
+        fb = np.log(1.0/costParams.DelayCostProportion2Hours-1.0)
         adr = 1.0/(t2-t1)  # reciprocal of determinant
         timeScaleFactor = adr*eb - adr*fb
         timeOffset = t2*adr*eb - t1*adr*fb
@@ -61,29 +70,29 @@ class Inner:
     def passengerDelayCost(self, costParams, payload, timeDelayed):
         # payload is namedtuple of Payload
         relativeDelayCost = self.perPassengerRelativeDelayCost (costParams, timeDelayed)
-        weightedPassengerAsymptote =
-            payload.StandardPassengerCount * costParams.MaximumStandardPassengerDelayCost +
+        weightedPassengerAsymptote = \
+            payload.StandardPassengerCount * costParams.MaximumStandardPassengerDelayCost + \
             payload.PremiumPassengerCount * costParams.MaximumPremiumPassengerDelayCost
         return relativeDelayCost * weightedPassengerAsymptote
 
-    def delayCost(costParams, payload, maybeTimeDelayed):
+    def _delayCost(self, costParams, payload, maybeTimeDelayed):
         """
          maybeTimeDelayed is real value or nan
          instead of Option object in F# to simplify the code
          output:  <Dollars>
         """
-        if np.isnan(maybeTimeDelayed):
+        if maybeTimeDelayed is None:
             return costParams.NonArrivalPenalty
-        else
+        else:
             # Total delay cost is sum of crew, otherHourlyCosts and passenger dissatisfaction
             timeDelayed = maybeTimeDelayed
             hourlyCost = timeDelayed * (costParams.CrewDelayCosts + costParams.OtherHourlyCosts)
-            dissatisfactionCost = passengerDelayCost( costParams, payload, timeDelayed)
+            dissatisfactionCost = self.passengerDelayCost( costParams, payload, timeDelayed)
             result = dissatisfactionCost + hourlyCost
-            return np.max (0.0,  result)
+            return max (0.0,  result)
 
     
-    def turbulenceCost(costParams, timeInTurbulence):
+    def turbulenceCost(self, costParams, timeInTurbulence):
         """
         timeInTurbulence : number of hours
         costParams: namedtuple of CostParameters
@@ -104,11 +113,10 @@ def flightCost( costParams, instructions, payload, fuelBurned, maybeTimeDelayed,
     inner = Inner()
     altitudeChangeCost = inner.altitudeOscillationCost( costParams , instructions)
     fuelCost = fuelBurned * costParams.FuelCost
-    delayCost = inner.delayCost( costParams, payload, maybeTimeDelayed)
+    delayCost = inner._delayCost(costParams, payload, maybeTimeDelayed)
     turbulenceCost = inner.turbulenceCost( costParams, turbulence)
     return Costs(fuelCost,
                  delayCost,
                  turbulenceCost,
                  altitudeChangeCost
                  )
-

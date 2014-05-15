@@ -1,106 +1,103 @@
+import Units
+import math
+
 from collections import namedtuple
-import numpy as np
 
-AscentModel = namedtuple('AscentModel',
-                          ['DistanceIntercept',
-                            'DistanceAltitude',
-                            'DistanceWeight',
-                            'DistanceAltitudeWeight',
-                            'TimeAltitudePower',
-                            'TimeIntercept',
-                            'TimeAltitude',
-                            'TimeWeight',
-                            'TimeAltitudeWeight',
-                            'FuelIntercept',
-                            'FuelAltitude',
-                            'FuelAltitudeSqrt ',
-                            'FuelWeight',
-                            'FuelAltitudeWeight',
-                            'FuelAltitudeSqrtWeight',
-                            'MaximumRateOfAscent'   # <Feet/Hours>
-                            ])
+AscentModel = namedtuple('AscentModel', [
+        'DistanceIntercept', #:float
+        'DistanceAltitude', #:float
+        'DistanceWeight', #:float
+        'DistanceAltitudeWeight', #:float
+        'TimeAltitudePower', # : float
+        'TimeIntercept', #:float
+        'TimeAltitude', #:float
+        'TimeWeight', #:float
+        'TimeAltitudeWeight', #:float
+        'FuelIntercept', # : float
+        'FuelAltitude', # : float
+        'FuelAltitudeSqrt',# : float
+        'FuelWeight', # : float
+        'FuelAltitudeWeight', # : float
+        'FuelAltitudeSqrtWeight', # :float
+        'MaximumRateOfAscent'
+        ])
 
+ascentModelMediumRange = AscentModel(
+     1.062,
+      5.224e-5,
+      5.215e-6,
+     2.029e-10,
+      1.2,
+      -3.775229,
+      3.226931e-06,
+      5.633243e-06,
+      2.077038e-11,
+      3.985,
+      -5.179e-05,
+      2.366e-02,
+      1.463e-05,
+      4.899e-10,
+      -1.121e-07,
+      240000.0)
 
-class Descent:
-    def __init__(self):
-        self.model = DescentModel(1.062,
-                                  5.224e-5,
-                                  5.215e-6,
-                                  2.029e-10,
-                                  1.2,
-                                  -3.775229,
-                                  3.226931e-06,
-                                  5.633243e-06,
-                                    2.077038e-11,
-                                    3.985,
-                                    -5.179e-05,
-                                    2.366e-02,
-                                    1.463e-05,
-                                    4.899e-10,
-                                   -1.121e-07,
-                                   240000.0)
+def calculateTime(model, altitude, weight):
+#(model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    a = altitude
+    w = weight
+    aTime = math.pow(a, model.TimeAltitudePower)
+    result = math.exp(model.TimeIntercept + model.TimeAltitude*aTime + model.TimeWeight*w + model.TimeAltitudeWeight*aTime*w)
+    return result
 
-    def caculateTime(self, altitude, weight):
-        # altitude: feet, weight: pound
-        
-        a =  altitude * 1.0
-        w =  weight * 1.0
-        aTime = a**self.model.TimeAltitudePower
-        result =
-            pd.exp(self.model.TimeIntercept + self.model.TimeAltitude*aTime + self.model.TimeWeight*w + self.model.TimeAltitudeWeight*aTime*w)
-        return result*1. # 0<Hours>
+def altitudeDerivativeWrtTime(model, altitude, weight):
+#(model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    a = max(1, altitude)
+    w = weight
+    time = calculateTime(model, altitude, weight)
+    multiplicand = \
+        (model.TimeAltitude + model.TimeAltitudeWeight*w) * \
+        model.TimeAltitudePower * math.pow(a, model.TimeAltitudePower-1.0)
+    dtda = time * multiplicand / 1.0
+    dadt = 1.0/dtda
+    result = min(model.MaximumRateOfAscent, dadt)
+    return result
 
-            
-    def altitudeDerivativeWrtTime(self, altitude, weight):
-        a = max(altitude, 1.0)
-        w = 1.0 * weight
-        time = self.calculateTime(altitude, weight)
-        multiplicand =
-            (self.model.TimeAltitude + self.model.TimeAltitudeWeight*w) * \
-            self.model.TimeAltitudePower * a**(self.model.TimeAltitudePower-1.0)
-        dtda = time * multiplicand / 1.0 #<Feet>
-        dadt = 1.0/dtda
-        return min( self.model.MaximumRateOfAscent, dadt)
+def calculateFuel(model, altitude, weight):
+#(model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    a = altitude
+    w = weight
+    aFuel = math.sqrt(altitude)
+    result = math.exp(
+        model.FuelIntercept + model.FuelAltitude*a + model.FuelAltitudeSqrt*aFuel + \
+        model.FuelWeight*w + \
+            model.FuelAltitudeWeight*a*w + model.FuelAltitudeSqrtWeight*aFuel*w)
+    return result
 
-    def calculateFule(self, altitude, weight):
-        a = 1.0 * altitude
-        w = 1.0 * weight
-        aFuel = np.sqrt (a)
-        result =
-            exp(
-                self.model.FuelIntercept + self.model.FuelAltitude*a + self.model.FuelAltitudeSqrt*aFuel + self.model.FuelWeight*w +
-                self.model.FuelAltitudeWeight*a*w + self.model.FuelAltitudeSqrtWeight*aFuel*w)
-        return result    
-
-
-    def fuelDerivativeWrtAltitude(self, altitude, weight):
-        a = 1.0 * altitude
-        w = 1.0 * weight
-        aFuelDerivative = 0.5/np.sqrt( a)
-        fuel = self.calculateFuel( altitude, weight)
-        multiplicand =
-            self.model.FuelAltitude + self.model.FuelAltitudeSqrt*aFuelDerivative + \
-            self.model.FuelAltitudeWeight*w + self.model.FuelAltitudeSqrtWeight*w*aFuelDerivative
-        dfda = fuel*multiplicand
-        return dfda * 1.0 # <FuelPounds/Feet>
-
-    def calculateRates(self, altitude, weight):
-         dAltitudeDTime = self.altitudeDerivativeWrtTime( altitude, weight)
-         dFuelDAltitude = self.fuelDerivativeWrtAltitude( altitude, weight)
-         dFuelDTime = dFuelDAltitude*dAltitudeDTime
-         return (dAltitudeDTime, dFuelDTime)
-
-    def calculateTimeFuelDistance(model, altitude, weight):
-         a = 1.0 * altitude
-         w = 1.0 * weight
-         time = self.calculateTime ( altitude, weight)
-         fuel = self.calculateFuel ( altitude, weight)
-         distance = np.exp(self.model.DistanceIntercept+self.model.DistanceAltitude*a+self.model.DistanceWeight*w+self.model.DistanceAltitudeWeight*a*w)
-         return (time,fuel*1.0,distance*1.0)  # <FuelPounds>, <NauticalMiles>  
+def fuelDerivativeWrtAltitude(model, altitude, weight):
+# (model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    a = altitude
+    w = weight
+    aFuelDerivative = 0.5/math.sqrt(a)
+    fuel = calculateFuel(model, altitude, weight)
+    multiplicand = \
+        model.FuelAltitude + model.FuelAltitudeSqrt*aFuelDerivative + \
+        model.FuelAltitudeWeight * w + model.FuelAltitudeSqrtWeight * w * aFuelDerivative
+    dfda = fuel*multiplicand
+    return dfda
 
 
+def calculateRates(model, altitude, weight):
+#(model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    dAltitudeDTime = altitudeDerivativeWrtTime(model, altitude, weight)
+    dFuelDAltitude = fuelDerivativeWrtAltitude(model, altitude, weight)
+    dFuelDTime = dFuelDAltitude*dAltitudeDTime
+    return (dAltitudeDTime, dFuelDTime)
 
-
-
-
-
+def calculateTimeFuelDistance(model, altitude, weight):
+# (model:AscentModel) (altitude:float<Feet>) (weight:float<Pounds>) =
+    a = altitude
+    w = weight
+    time = calculateTime(model, altitude, weight)
+    fuel = calculateFuel(model, altitude, weight)
+    distance = math.exp(model.DistanceIntercept + model.DistanceAltitude * a +  \
+                        model.DistanceWeight * w + model.DistanceAltitudeWeight * a * w)
+    return (time,fuel,distance)
